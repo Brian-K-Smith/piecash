@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 import pytest
 from sqlalchemy_utils import database_exists, drop_database
-from piecash import create_book, Account, Commodity, Employee, Customer, Vendor, Transaction, Split, Price
+from piecash import create_book, open_book, Account, Commodity, Employee, Customer, Vendor, Transaction, Split, Price
 
 test_folder = os.path.dirname(os.path.realpath(__file__))
 book_folder = os.path.join(test_folder, "..", "gnucash_books")
@@ -12,12 +12,14 @@ file_template = os.path.join(book_folder, "empty_book.gnucash")
 file_for_test = os.path.join(test_folder, "empty_book_for_test.gnucash")
 file_template_full = os.path.join(book_folder, "test_book.gnucash")
 file_for_test_full = os.path.join(test_folder, "test_book_for_test.gnucash")
+file_ghost_kvp_scheduled_transaction = os.path.join(book_folder, "ghost_kvp_scheduled_transaction.gnucash")
+file_ghost_kvp_scheduled_transaction_for_test = os.path.join(test_folder, "ghost_kvp_scheduled_transaction_for_test.gnucash")
 
 if sys.version_info.major == 3:
     def run_file(fname):
         with open(fname) as f:
             code = compile(f.read(), fname, 'exec')
-            exec (code, {})
+            exec(code, {})
 else:
     def run_file(fname):
         return execfile(fname, {})
@@ -66,6 +68,11 @@ else:
 
 @pytest.yield_fixture(params=[Customer, Vendor, Employee])
 def Person(request):
+    yield request.param
+
+
+@pytest.yield_fixture(params=["2.6", "2.7"])
+def format_version(request):
     yield request.param
 
 
@@ -228,6 +235,30 @@ def book_transactions(request):
 
     if name and database_exists(name):
         drop_database(name)
+
+
+@pytest.yield_fixture()
+def book_investment(request):
+    """
+    Returns the book that contains investment accounts and transactions.
+    """
+    # name = request.param
+    # print(name)
+    file_template_full = os.path.join(book_folder, "investment.gnucash")
+
+    with open_book(file_template_full) as book:
+        yield book
+
+
+@pytest.yield_fixture(params=["", ".272"])
+def book_sample(request):
+    """
+    Returns a simple sample book for 2.6.N
+    """
+    file_template_full = os.path.join(book_folder, "simple_sample{}.gnucash".format(request.param))
+
+    with open_book(file_template_full) as book:
+        yield book
 
 
 def is_inmemory_sqlite(book_basic):

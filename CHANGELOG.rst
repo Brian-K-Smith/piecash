@@ -1,10 +1,23 @@
 What's new
 ==========
 
+
 In development
 ~~~~~~~~~~~~~~
 
-- Empty
+- add get_quantity on an account to retrieve the balance in quantity of the accound (for non currency based accounts)
+- fix bug when providing a float instead of a Decimal to a numeric value (@gregorias)
+- support new format for date for 2.7/2.8 (@MisterY, @sdementen)
+- fix bug where transactions based on deleted scheduled transactions cause exceptions (@spookylukey)
+
+Version 0.13.0 (2017-10-08)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- upgrade CI (appveyor and travis) to 2.7/3.4/3.5/3.6
+- upgrade dependencies
+- df_splits: allow user to specify additional fields to extract (@NigelCleland)
+- improve documentation (@Brian-K-Smith)
+
 
 Version 0.12.0 (2017-02-15)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -13,11 +13,60 @@ from .book import Book
 from .._common import GnucashException
 from ..sa_extra import create_piecash_engine, DeclarativeBase, Session
 
-version_supported = {u'Gnucash-Resave': 19920, u'invoices': 3, u'books': 1, u'accounts': 1, u'slots': 3,
-                     u'taxtables': 2, u'lots': 2, u'orders': 1, u'vendors': 1, u'customers': 2, u'jobs': 1,
-                     u'transactions': 3, u'Gnucash': 2060400, u'budget_amounts': 1, u'billterms': 2, u'recurrences': 2,
-                     u'entries': 3, u'prices': 2, u'schedxactions': 1, u'splits': 4, u'taxtable_entries': 3,
-                     u'employees': 2, u'commodities': 1, u'budgets': 1}
+version_supported = {
+    '2.6': {
+        'Gnucash': 2060400,
+        'Gnucash-Resave': 19920,
+        'accounts': 1,
+        'billterms': 2,
+        'books': 1,
+        'budget_amounts': 1,
+        'budgets': 1,
+        'commodities': 1,
+        'customers': 2,
+        'employees': 2,
+        'entries': 3,
+        'invoices': 3,
+        'jobs': 1,
+        'lots': 2,
+        'orders': 1,
+        'prices': 2,
+        'recurrences': 2,
+        'schedxactions': 1,
+        'slots': 3,
+        'splits': 4,
+        'taxtable_entries': 3,
+        'taxtables': 2,
+        'transactions': 3,
+        'vendors': 1,
+    },
+    '2.7': {
+        'Gnucash': 2070200,
+        'Gnucash-Resave': 19920,
+        'accounts': 1,
+        'billterms': 2,
+        'books': 1,
+        'budget_amounts': 1,
+        'budgets': 1,
+        'commodities': 1,
+        'customers': 2,
+        'employees': 2,
+        'entries': 4,
+        'invoices': 4,
+        'jobs': 1,
+        'lots': 2,
+        'orders': 1,
+        'prices': 3,
+        'recurrences': 2,
+        'schedxactions': 1,
+        'slots': 4,
+        'splits': 4,
+        'taxtable_entries': 3,
+        'taxtables': 2,
+        'transactions': 4,
+        'vendors': 1,
+    }
+}
 
 # this is not a declarative as it is used before binding the session to an engine.
 gnclock = Table(u'gnclock', DeclarativeBase.metadata,
@@ -90,7 +139,11 @@ def build_uri(sqlite_file=None,
 
     if uri_conn is None:
         if sqlite_file:
-            uri_conn = "sqlite:///{}".format(sqlite_file)
+            if sqlite_file.startswith("sqlite:///"):
+                # already have the protocol specified.
+                uri_conn = sqlite_file
+            else:
+                uri_conn = "sqlite:///{}".format(sqlite_file)
         else:
             uri_conn = "sqlite:///:memory:"
 
@@ -108,6 +161,7 @@ def create_book(sqlite_file=None,
                 db_name=None,
                 db_host=None,
                 db_port=None,
+                version_format="2.6",
                 **kwargs):
     """Create a new empty GnuCash book. If both sqlite_file and uri_conn are None, then an "in memory" sqlite book is created.
 
@@ -122,6 +176,7 @@ def create_book(sqlite_file=None,
     :param str db_name: name of database
     :param str db_host: host of database
     :param str db_port: port of database
+    :param str version_format: the format (2.6 or 2.7) for the schema tables to generate
 
     :return: the document as a gnucash session
     :rtype: :class:`GncSession`
@@ -185,7 +240,10 @@ def create_book(sqlite_file=None,
     s = Session(bind=engine)
 
     # create all rows in version table
-    for table_name, table_version in version_supported.items():
+    assert version_format in version_supported, "The 'version_format'={} is not supported. " \
+                                                "Choose one of {}".format(version_format,
+                                                                          list(version_supported.keys()))
+    for table_name, table_version in version_supported[version_format].items():
         s.add(Version(table_name=table_name, table_version=table_version))
 
     # create book and merge with session
@@ -273,15 +331,14 @@ def open_book(sqlite_file=None,
     s = Session(bind=engine)
 
     # check the versions in the table versions is consistent with the API
-    # TODO: improve this in the future to allow more than 1 version
-    version_book = {v.table_name: v.table_version for v in s.query(Version).all()}
-    for k, v in version_book.items():
-        # skip GnuCash
-        if k in ("Gnucash"):
-            continue
-        assert version_supported[k] == v, "Unsupported version for table {} : got {}, supported {}".format(k, v,
-                                                                                                           version_supported[
-                                                                                                               k])
+    version_book = {v.table_name: v.table_version
+                    for v in s.query(Version).all()
+                    if "Gnucash" not in v.table_name}
+    assert any(version_book == {k: v
+                                for k, v in vt.items() if
+                                "Gnucash" not in k}
+               for version, vt in version_supported.items()), "Unsupported table versions"
+
     book = s.query(Book).one()
     adapt_session(s, book=book, readonly=readonly)
     if not readonly:
@@ -323,7 +380,7 @@ def adapt_session(session, book, readonly):
     # add logic to make session readonly
     def readonly_commit(*args, **kwargs):
         # session.rollback()
-        raise GnucashException("You cannot change the DB, it is locked !")
+        raise GnucashException("You cannot change the DB, it was opened as readonly!")
 
     if readonly:
         session.commit = readonly_commit
