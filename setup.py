@@ -5,8 +5,9 @@ import imp
 import os
 import subprocess
 import sys
-
 # # Python 2.6 subprocess.check_output compatibility. Thanks Greg Hewgill!
+from distutils.command.install_scripts import install_scripts
+
 if 'check_output' not in dir(subprocess):
     def check_output(cmd_args, *args, **kwargs):
         proc = subprocess.Popen(
@@ -207,6 +208,7 @@ python_version_specific_requires = []
 #     python_version_specific_requires.append('argparse')
 
 
+
 # See here for more options:
 # <http://pythonhosted.org/setuptools/setuptools.html>
 
@@ -250,15 +252,21 @@ setup_dict = dict(
                          'enum-compat',
                          'tzlocal',
                          'yahoo-finance',
+                         'click',
                      ] + python_version_specific_requires,
     # Allow tests to be run with `python setup.py test'.
     tests_require=[
         'pytest',
         'py',
     ],
-    # console=['scripts/piecash_ledger.py','scripts/piecash_toqif.py'],
-    scripts=['scripts/piecash_ledger.py', 'scripts/piecash_toqif.py', 'scripts/piecash_prices.py'],
-    cmdclass={'test': PyTest},
+    entry_points={
+        'console_scripts': [
+            'piecash = piecash.scripts.export:cli',
+        ]
+    },
+    cmdclass={
+        'test': PyTest,
+    },
     test_suite="tests",
     zip_safe=False,  # don't use eggs
 )
